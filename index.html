@@ -241,6 +241,11 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
   <div class="auth-card">
     <div class="auth-logo"><span>Senior</span> Trip ✈️</div>
     <div class="auth-subtitle">Sign in or create an account to join your crew.</div>
+    <div id="firebase-setup-notice" style="background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.25);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#c9a227;line-height:1.6;">
+      <strong>⚙️ First-time Firebase setup required:</strong><br/>
+      In Firebase Console: <strong>Authentication → Sign-in methods → Email/Password → Enable</strong>. Also make sure <strong>Firestore Database</strong> is created.
+      <button onclick="document.getElementById('firebase-setup-notice').style.display='none'" style="display:inline-block;margin-left:8px;background:none;border:none;color:#c9a227;cursor:pointer;font-size:11px;text-decoration:underline;padding:0;font-family:inherit;">Dismiss</button>
+    </div>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
       <button class="auth-tab" onclick="switchAuthTab('signup')">Create Account</button>
@@ -544,9 +549,6 @@ const firebaseConfig = {
   messagingSenderId: "856971304617",
   appId: "1:856971304617:web:c0f82072e0cc88a5d193b8"
 };
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -643,7 +645,9 @@ function friendlyAuthError(code){
     'auth/weak-password':'Password must be at least 6 characters.',
     'auth/too-many-requests':'Too many failed attempts. Please wait a moment and try again.',
     'auth/network-request-failed':'Network error. Check your connection and try again.',
-    'auth/popup-closed-by-user':'Sign-in was cancelled.'
+    'auth/popup-closed-by-user':'Sign-in was cancelled.',
+    'auth/configuration-not-found':'Email/Password sign-in is not enabled in Firebase. Go to Firebase Console → Authentication → Sign-in methods → Email/Password → Enable it, then try again.',
+    'auth/operation-not-allowed':'Email/Password sign-in is disabled. Enable it in Firebase Console → Authentication → Sign-in methods.'
   };
   return map[code]||`Something went wrong (${code}). Please try again.`;
 }
