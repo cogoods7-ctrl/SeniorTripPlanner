@@ -549,6 +549,9 @@ const firebaseConfig = {
   messagingSenderId: "856971304617",
   appId: "1:856971304617:web:c0f82072e0cc88a5d193b8"
 };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -615,16 +618,6 @@ window.doSignup = async function() {
     showAuthError(friendlyAuthError(e.code));
     setLoading('signup-btn',false,'Create Account');
   }
-};
-
-window.doGoogleSignIn = async function() {
-  try{
-    const result=await signInWithPopup(auth,googleProvider);
-    const user=result.user;
-    const uRef=doc(db,'users',user.uid);
-    const snap=await getDoc(uRef);
-    if(!snap.exists()) await setDoc(uRef,{name:user.displayName||user.email,email:user.email,createdAt:serverTimestamp()});
-  }catch(e){showAuthError(friendlyAuthError(e.code));}
 };
 
 window.doSignOut = async function() {
