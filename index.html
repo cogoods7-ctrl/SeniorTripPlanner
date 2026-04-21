@@ -257,9 +257,6 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
         <input class="inp" id="login-password" type="password" placeholder="••••••••"/>
       </div>
       <button class="btn btn-full" id="login-btn" onclick="doLogin()">Sign In</button>
-      <div style="text-align:center;margin-top:14px;">
-        <button onclick="doGoogleSignIn()" class="btn btn-ghost btn-full" style="margin-top:0;">🔵 Continue with Google</button>
-      </div>
     </div>
     <!-- SIGNUP -->
     <div id="auth-signup" class="auth-step">
@@ -532,7 +529,7 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup
+  signOut, onAuthStateChanged, updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, addDoc, getDocs, onSnapshot, query, where, serverTimestamp, deleteField
@@ -550,7 +547,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -584,8 +580,14 @@ window.doLogin = async function() {
   const pw=document.getElementById('login-password').value;
   if(!email||!pw)return showAuthError('Please fill in all fields.');
   setLoading('login-btn',true);
-  try{await signInWithEmailAndPassword(auth,email,pw);}
-  catch(e){showAuthError(friendlyAuthError(e.code));setLoading('login-btn',false,'Sign In');}
+  try{
+    await signInWithEmailAndPassword(auth,email,pw);
+    // onAuthStateChanged handles the rest; reset btn in case it stays visible
+    setLoading('login-btn',false,'Sign In');
+  }catch(e){
+    showAuthError(friendlyAuthError(e.code));
+    setLoading('login-btn',false,'Sign In');
+  }
 };
 
 window.doSignup = async function() {
@@ -597,9 +599,20 @@ window.doSignup = async function() {
   setLoading('signup-btn',true);
   try{
     const cred=await createUserWithEmailAndPassword(auth,email,pw);
+    // Update display name on the auth profile
     await updateProfile(cred.user,{displayName:name});
+    // Write user doc to Firestore
     await setDoc(doc(db,'users',cred.user.uid),{name,email,createdAt:serverTimestamp()});
-  }catch(e){showAuthError(friendlyAuthError(e.code));setLoading('signup-btn',false,'Create Account');}
+    // Manually update currentUser so the rest of the app sees the display name
+    currentUser=auth.currentUser;
+    document.getElementById('sf-user-name').textContent=name;
+    setLoading('signup-btn',false,'Create Account');
+    document.getElementById('auth-overlay').classList.add('hidden');
+    await loadUserTrips();
+  }catch(e){
+    showAuthError(friendlyAuthError(e.code));
+    setLoading('signup-btn',false,'Create Account');
+  }
 };
 
 window.doGoogleSignIn = async function() {
@@ -621,17 +634,26 @@ window.doSignOut = async function() {
 };
 
 function friendlyAuthError(code){
-  const map={'auth/user-not-found':'No account with that email.','auth/wrong-password':'Incorrect password.',
-    'auth/email-already-in-use':'That email is already registered.','auth/invalid-email':'Invalid email address.',
-    'auth/weak-password':'Password is too weak.','auth/too-many-requests':'Too many attempts. Try again later.',
-    'auth/popup-closed-by-user':'Sign-in popup was closed.'};
-  return map[code]||'Something went wrong. Please try again.';
+  const map={
+    'auth/user-not-found':'No account found with that email.',
+    'auth/wrong-password':'Incorrect password. Please try again.',
+    'auth/invalid-credential':'Incorrect email or password. Please try again.',
+    'auth/email-already-in-use':'An account with that email already exists.',
+    'auth/invalid-email':'Please enter a valid email address.',
+    'auth/weak-password':'Password must be at least 6 characters.',
+    'auth/too-many-requests':'Too many failed attempts. Please wait a moment and try again.',
+    'auth/network-request-failed':'Network error. Check your connection and try again.',
+    'auth/popup-closed-by-user':'Sign-in was cancelled.'
+  };
+  return map[code]||`Something went wrong (${code}). Please try again.`;
 }
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   if(user){
     currentUser=user;
+    // If signup already handled transition, don't double-trigger
+    if(document.getElementById('auth-overlay').classList.contains('hidden')) return;
     document.getElementById('auth-overlay').classList.add('hidden');
     document.getElementById('sf-user-name').textContent=user.displayName||user.email;
     await loadUserTrips();
@@ -644,9 +666,12 @@ onAuthStateChanged(auth, async user => {
 
 // ── TRIPS ─────────────────────────────────────────────────────────────────
 async function loadUserTrips(){
-  const snap = await getDocs(query(collection(db,'trips'),where(`members.${currentUser.uid}.uid`,'==',currentUser.uid)));
-  const trips=[];
-  snap.forEach(d=>trips.push({id:d.id,...d.data()}));
+  // Query trips where current user is listed in memberUids array (simple, indexable)
+  let trips=[];
+  try{
+    const snap=await getDocs(query(collection(db,'trips'),where('memberUids','array-contains',currentUser.uid)));
+    snap.forEach(d=>trips.push({id:d.id,...d.data()}));
+  }catch(e){console.error('Trip load error:',e);}
   const wrap=document.getElementById('trip-list-wrap');
   const sub=document.getElementById('trip-select-sub');
   if(trips.length===0){
@@ -660,7 +685,7 @@ async function loadUserTrips(){
         <div class="trip-icon">✈️</div>
         <div class="trip-info">
           <div class="trip-name">${esc(t.tripName||'Untitled Trip')}</div>
-          <div class="trip-meta">${Object.keys(t.members||{}).length} members · Goal: $${(t.savingsGoal||0).toLocaleString()}</div>
+          <div class="trip-meta">${(t.memberUids||[]).length} members · Goal: $${(t.savingsGoal||0).toLocaleString()}</div>
         </div>
         <span class="trip-role ${role==='admin'?'role-admin':'role-member'}">${role}</span>
       </div>`;
@@ -683,19 +708,26 @@ window.createTrip = async function(){
   const suggestion=getBudgetSuggestion(type,1);
   setLoading('create-trip-btn',true);
   try{
+    const displayName=currentUser.displayName||currentUser.email;
     const tripRef=await addDoc(collection(db,'trips'),{
       tripName:name,tripDate:date,tripType:type,savingsGoal:suggestion,
       monthlyRate:5,createdBy:currentUser.uid,createdAt:serverTimestamp(),
-      members:{[currentUser.uid]:{uid:currentUser.uid,name:currentUser.displayName||currentUser.email,role:'admin',joinedAt:serverTimestamp()}}
+      // memberUids array for simple array-contains queries
+      memberUids:[currentUser.uid],
+      members:{[currentUser.uid]:{uid:currentUser.uid,name:displayName,role:'admin'}}
     });
     await addDoc(collection(db,'trips',tripRef.id,'tripMembers'),{
-      uid:currentUser.uid,name:currentUser.displayName||currentUser.email,
+      uid:currentUser.uid,name:displayName,
       role:'admin',payments:{},addedAt:serverTimestamp()
     });
     document.getElementById('new-trip-name').value='';
     setLoading('create-trip-btn',false,'Create Trip & Start Planning');
     enterTrip(tripRef.id);
-  }catch(e){console.error(e);showSync('Error creating trip',true);setLoading('create-trip-btn',false,'Create Trip & Start Planning');}
+  }catch(e){
+    console.error(e);
+    showSync('Error creating trip: '+e.message,true);
+    setLoading('create-trip-btn',false,'Create Trip & Start Planning');
+  }
 };
 
 window.enterTrip = async function(tripId){
@@ -1117,7 +1149,11 @@ window.addMember = async function(){
   if(!n||members.length>=12)return;
   const newId=uid();
   await addDoc(tripCol('tripMembers'),{uid:newId,name:n,role:'member',payments:{},addedAt:serverTimestamp(),addedBy:currentUser.uid});
-  await updateDoc(doc(db,'trips',currentTripId),{[`members.${newId}`]:{uid:newId,name:n,role:'member'}});
+  // Keep members map and memberUids in sync
+  await updateDoc(doc(db,'trips',currentTripId),{
+    [`members.${newId}`]:{uid:newId,name:n,role:'member'},
+    memberUids: [...(currentTripData.memberUids||[]), newId]
+  });
   document.getElementById('mem-input').value='';showSync('Member added ✓');
 };
 
@@ -1125,8 +1161,26 @@ window.removeMember = async function(docId,membUid){
   if(userRole!=='admin')return;
   if(!confirm('Remove this member?'))return;
   await deleteDoc(tripDoc('tripMembers',docId));
-  await updateDoc(doc(db,'trips',currentTripId),{[`members.${membUid}`]:deleteField()});
+  const updatedUids=(currentTripData.memberUids||[]).filter(id=>id!==membUid);
+  await updateDoc(doc(db,'trips',currentTripId),{
+    [`members.${membUid}`]:deleteField(),
+    memberUids:updatedUids
+  });
   showSync('Member removed ✓');
+};
+
+window.leaveTrip = async function(){
+  if(!confirm('Leave this trip? You will need an admin to re-add you.'))return;
+  try{
+    const updatedUids=(currentTripData.memberUids||[]).filter(id=>id!==currentUser.uid);
+    await updateDoc(doc(db,'trips',currentTripId),{
+      [`members.${currentUser.uid}`]:deleteField(),
+      memberUids:updatedUids
+    });
+    currentTripId=null;currentTripData=null;
+    unsubAll();
+    await loadUserTrips();
+  }catch(e){showSync('Error leaving trip',true);}
 };
 
 window.saveSettings = async function(){
