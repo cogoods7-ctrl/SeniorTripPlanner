@@ -20,6 +20,43 @@ body{display:flex;background:var(--navy);font-family:'DM Sans',sans-serif;color:
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--coral);border-radius:2px;}
 
+/* ── PASSWORD TOGGLE WRAPPER ── */
+.pw-wrap{position:relative;display:flex;align-items:center;}
+.pw-wrap .inp{padding-right:44px;}
+.pw-toggle{position:absolute;right:12px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px;transition:color 0.18s;line-height:1;flex-shrink:0;}
+.pw-toggle:hover{color:var(--text);}
+
+/* ── MOBILE BOTTOM NAV ── */
+#mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy2);border-top:1px solid var(--border);z-index:100;padding:0 4px env(safe-area-inset-bottom,0);}
+.mob-nav-inner{display:flex;justify-content:space-around;align-items:center;padding:6px 0;}
+.mob-nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:9px;font-weight:500;padding:6px 8px;border-radius:8px;min-width:40px;transition:all 0.18s;-webkit-tap-highlight-color:transparent;}
+.mob-nav-btn.active{color:var(--coral);}
+.mob-nav-icon{font-size:18px;line-height:1;}
+
+/* ── MOBILE HEADER ── */
+#mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:56px;background:var(--navy2);border-bottom:1px solid var(--border);z-index:100;align-items:center;justify-content:space-between;padding:0 16px;}
+.mob-trip-name{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;color:var(--text);}
+.mob-trip-name span{color:var(--coral);}
+.mob-funds{font-family:'Playfair Display',serif;font-size:16px;color:var(--teal);}
+
+@media(max-width:768px){
+  html,body{overflow:auto;}
+  #sidebar{display:none;}
+  #mobile-nav{display:block;}
+  #mobile-header{display:flex;}
+  #main{padding:72px 16px 100px;overflow:visible;height:auto;min-height:100vh;}
+  #main::before{display:none;}
+  .page-title{font-size:24px;}
+  .g2,.g3,.g32{grid-template-columns:1fr!important;gap:12px;}
+  .auth-card{padding:28px 20px;border-radius:20px;}
+  .trip-select-card{padding:28px 20px;border-radius:20px;margin:16px auto;}
+  #trip-select-overlay{align-items:flex-start;padding:0;}
+  .big-num{font-size:38px;}
+  .card{padding:16px;}
+  .pay-table{font-size:12px;}
+  .pay-cell{width:28px;height:24px;font-size:11px;}
+}
+
 /* ── AUTH OVERLAY ── */
 #auth-overlay{
   position:fixed;inset:0;background:var(--navy);z-index:2000;
@@ -248,18 +285,22 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
     </div>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
-      <button class="auth-tab" onclick="switchAuthTab('signup')">Create Account</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
+      <button class="auth-tab" onclick="switchAuthTab('join')">Join Trip</button>
     </div>
     <div id="auth-error" class="auth-error"></div>
     <!-- LOGIN -->
     <div id="auth-login" class="auth-step active">
       <div class="mb16">
         <label class="field-label">Email</label>
-        <input class="inp" id="login-email" type="email" placeholder="you@email.com"/>
+        <input class="inp" id="login-email" type="email" placeholder="you@email.com" autocomplete="email"/>
       </div>
       <div class="mb20">
         <label class="field-label">Password</label>
-        <input class="inp" id="login-password" type="password" placeholder="••••••••"/>
+        <div class="pw-wrap">
+          <input class="inp" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+          <button class="pw-toggle" type="button" onclick="togglePw('login-password',this)" title="Show/hide password">👁</button>
+        </div>
       </div>
       <button class="btn btn-full" id="login-btn" onclick="doLogin()">Sign In</button>
     </div>
@@ -267,17 +308,37 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
     <div id="auth-signup" class="auth-step">
       <div class="mb16">
         <label class="field-label">Display Name</label>
-        <input class="inp" id="signup-name" type="text" placeholder="Your name"/>
+        <input class="inp" id="signup-name" type="text" placeholder="Your name" autocomplete="name"/>
       </div>
       <div class="mb16">
         <label class="field-label">Email</label>
-        <input class="inp" id="signup-email" type="email" placeholder="you@email.com"/>
+        <input class="inp" id="signup-email" type="email" placeholder="you@email.com" autocomplete="email"/>
       </div>
       <div class="mb20">
         <label class="field-label">Password</label>
-        <input class="inp" id="signup-password" type="password" placeholder="Min 6 characters"/>
+        <div class="pw-wrap">
+          <input class="inp" id="signup-password" type="password" placeholder="Min 6 characters" autocomplete="new-password"/>
+          <button class="pw-toggle" type="button" onclick="togglePw('signup-password',this)" title="Show/hide password">👁</button>
+        </div>
       </div>
       <button class="btn btn-full" id="signup-btn" onclick="doSignup()">Create Account</button>
+    </div>
+    <!-- JOIN TRIP -->
+    <div id="auth-join" class="auth-step">
+      <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:12px;padding:14px;margin-bottom:18px;">
+        <div style="color:var(--teal);font-weight:600;font-size:13px;margin-bottom:4px;">🔑 How joining works</div>
+        <div style="color:var(--muted);font-size:12px;line-height:1.6;">Ask your trip's <strong style="color:var(--text);">admin</strong> for the Trip Code. Enter it below and you'll be added instantly.</div>
+      </div>
+      <div class="mb16">
+        <label class="field-label">Your Name</label>
+        <input class="inp" id="join-name" type="text" placeholder="Your name (as it'll appear in the trip)"/>
+      </div>
+      <div class="mb20">
+        <label class="field-label">Trip Code</label>
+        <input class="inp" id="join-code" type="text" placeholder="e.g. abc1234" style="text-transform:lowercase;letter-spacing:0.06em;font-size:16px;font-weight:600;"/>
+      </div>
+      <button class="btn btn-full" id="join-btn" onclick="doJoinTrip()">Join Trip</button>
+      <div style="color:var(--dim);font-size:11px;margin-top:12px;text-align:center;">Already have an account? <button onclick="switchAuthTab('login')" style="background:none;border:none;color:var(--coral);cursor:pointer;font-size:11px;font-family:inherit;text-decoration:underline;">Sign in instead</button></div>
     </div>
   </div>
 </div>
@@ -341,6 +402,26 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
     <div class="sf-amount" id="sf-total">$0</div>
     <div class="sf-sub">Goal: <span id="sf-goal">—</span></div>
     <div class="sf-user"><div class="sf-user-dot"></div><span id="sf-user-name">—</span></div>
+  </div>
+</div>
+
+<!-- ── MOBILE HEADER ── -->
+<div id="mobile-header">
+  <div class="mob-trip-name"><span id="mob-trip-name">Senior</span> Trip ✈️</div>
+  <div class="mob-funds" id="mob-funds">$0</div>
+</div>
+
+<!-- ── MOBILE BOTTOM NAV ── -->
+<div id="mobile-nav">
+  <div class="mob-nav-inner">
+    <button class="mob-nav-btn active" data-page="dashboard"><span class="mob-nav-icon">📊</span>Home</button>
+    <button class="mob-nav-btn" data-page="funds"><span class="mob-nav-icon">💰</span>Funds</button>
+    <button class="mob-nav-btn" data-page="locations"><span class="mob-nav-icon">📍</span>Places</button>
+    <button class="mob-nav-btn" data-page="bucketlist"><span class="mob-nav-icon">📝</span>List</button>
+    <button class="mob-nav-btn" data-page="votes"><span class="mob-nav-icon">🗳️</span>Polls</button>
+    <button class="mob-nav-btn" data-page="expenses"><span class="mob-nav-icon">⚖️</span>Split</button>
+    <button class="mob-nav-btn" data-page="announcements"><span class="mob-nav-icon">📢</span>Board</button>
+    <button class="mob-nav-btn" data-page="settings"><span class="mob-nav-icon">⚙️</span>Settings</button>
   </div>
 </div>
 
@@ -573,10 +654,20 @@ function setLoading(btnId,loading,label=''){const b=document.getElementById(btnI
 
 // ── AUTH UI ───────────────────────────────────────────────────────────────
 window.switchAuthTab = function(tab) {
-  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='login'?0:1)));
-  document.getElementById('auth-login').classList.toggle('active', tab==='login');
-  document.getElementById('auth-signup').classList.toggle('active', tab==='signup');
+  const tabs=['login','signup','join'];
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
+  tabs.forEach(t=>{
+    const el=document.getElementById('auth-'+t);
+    if(el)el.classList.toggle('active',t===tab);
+  });
   document.getElementById('auth-error').classList.remove('show');
+};
+
+window.togglePw = function(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁';
 };
 function showAuthError(msg){const el=document.getElementById('auth-error');el.textContent=msg;el.classList.add('show');}
 
@@ -628,6 +719,52 @@ window.doSignOut = async function() {
   document.getElementById('auth-overlay').classList.remove('hidden');
 };
 
+// Join a trip using its short code (first 7 chars of trip doc ID)
+window.doJoinTrip = async function() {
+  const name=document.getElementById('join-name').value.trim();
+  const code=document.getElementById('join-code').value.trim().toLowerCase();
+  if(!name)return showAuthError('Please enter your name.');
+  if(!code||code.length<4)return showAuthError('Please enter a valid trip code.');
+  setLoading('join-btn',true);
+  try{
+    // Trip codes are the first 7 chars of the Firestore doc ID
+    // We query all trips and find the one whose ID starts with the code
+    const snap=await getDocs(collection(db,'trips'));
+    let foundTrip=null;
+    snap.forEach(d=>{if(d.id.startsWith(code))foundTrip={id:d.id,...d.data()};});
+    if(!foundTrip){
+      showAuthError('No trip found with that code. Double-check with your admin.');
+      setLoading('join-btn',false,'Join Trip');return;
+    }
+    const tripId=foundTrip.id;
+    // Check not already a member
+    if((foundTrip.memberUids||[]).includes(currentUser.uid)){
+      setLoading('join-btn',false,'Join Trip');
+      document.getElementById('auth-overlay').classList.add('hidden');
+      await loadUserTrips();return;
+    }
+    const displayName=name||currentUser.displayName||currentUser.email;
+    // Add as tripMember sub-doc
+    await addDoc(collection(db,'trips',tripId,'tripMembers'),{
+      uid:currentUser.uid,name:displayName,role:'member',payments:{},addedAt:serverTimestamp()
+    });
+    // Update top-level trip doc
+    await updateDoc(doc(db,'trips',tripId),{
+      [`members.${currentUser.uid}`]:{uid:currentUser.uid,name:displayName,role:'member'},
+      memberUids:[...(foundTrip.memberUids||[]),currentUser.uid]
+    });
+    setLoading('join-btn',false,'Join Trip');
+    document.getElementById('join-code').value='';
+    document.getElementById('join-name').value='';
+    document.getElementById('auth-overlay').classList.add('hidden');
+    await loadUserTrips();
+  }catch(e){
+    console.error(e);
+    showAuthError('Error joining trip: '+e.message);
+    setLoading('join-btn',false,'Join Trip');
+  }
+};
+
 function friendlyAuthError(code){
   const map={
     'auth/user-not-found':'No account found with that email.',
@@ -663,7 +800,6 @@ onAuthStateChanged(auth, async user => {
 
 // ── TRIPS ─────────────────────────────────────────────────────────────────
 async function loadUserTrips(){
-  // Query trips where current user is listed in memberUids array (simple, indexable)
   let trips=[];
   try{
     const snap=await getDocs(query(collection(db,'trips'),where('memberUids','array-contains',currentUser.uid)));
@@ -672,17 +808,19 @@ async function loadUserTrips(){
   const wrap=document.getElementById('trip-list-wrap');
   const sub=document.getElementById('trip-select-sub');
   if(trips.length===0){
-    wrap.innerHTML='<div class="empty" style="padding:20px 0;">No trips yet. Create your first one below!</div>';
-    sub.textContent='Create a trip to get started.';
+    wrap.innerHTML='<div class="empty" style="padding:20px 0;">No trips yet. Create one below or use a Trip Code to join!</div>';
+    sub.textContent='Create a trip or join one with a code.';
   } else {
-    sub.textContent='Select a trip or create a new one.';
+    sub.textContent='Select a trip, or create / join another.';
     wrap.innerHTML=trips.map(t=>{
       const role=t.members?.[currentUser.uid]?.role||'member';
+      const code=t.id.slice(0,7);
       return`<div class="trip-item" onclick="enterTrip('${t.id}')">
         <div class="trip-icon">✈️</div>
         <div class="trip-info">
           <div class="trip-name">${esc(t.tripName||'Untitled Trip')}</div>
           <div class="trip-meta">${(t.memberUids||[]).length} members · Goal: $${(t.savingsGoal||0).toLocaleString()}</div>
+          ${role==='admin'?`<div style="color:var(--dim);font-size:11px;margin-top:2px;">Share code: <strong style="color:var(--teal);letter-spacing:0.05em;">${code}</strong></div>`:''}
         </div>
         <span class="trip-role ${role==='admin'?'role-admin':'role-member'}">${role}</span>
       </div>`;
@@ -753,6 +891,8 @@ function subscribeTrip(){
     currentTripData={id:snap.id,...snap.data()};
     userRole=currentTripData.members?.[currentUser.uid]?.role||'member';
     document.getElementById('sidebar-trip-name').textContent=currentTripData.tripName||'Senior';
+    const mobName=document.getElementById('mob-trip-name');
+    if(mobName)mobName.textContent=currentTripData.tripName||'Senior';
     document.getElementById('sf-goal').textContent=`$${(currentTripData.savingsGoal||0).toLocaleString()}`;
     renderSidebar();
     render(currentPage);
@@ -770,16 +910,23 @@ function unsubAll(){unsubListeners.forEach(u=>u());unsubListeners=[];}
 
 // ── CURRENT PAGE ──────────────────────────────────────────────────────────
 let currentPage='dashboard';
+
+function navigateTo(p){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
+  document.querySelectorAll('.mob-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
+  document.querySelectorAll('.page').forEach(pg=>pg.classList.add('hidden'));
+  document.getElementById('page-'+p).classList.remove('hidden');
+  currentPage=p;
+  // Scroll to top on mobile when changing pages
+  window.scrollTo(0,0);
+  render(p);
+}
+
 document.querySelectorAll('.nav-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const p=btn.dataset.page;
-    document.querySelectorAll('.page').forEach(pg=>pg.classList.add('hidden'));
-    document.getElementById('page-'+p).classList.remove('hidden');
-    currentPage=p;
-    render(p);
-  });
+  btn.addEventListener('click',()=>navigateTo(btn.dataset.page));
+});
+document.querySelectorAll('.mob-nav-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>navigateTo(btn.dataset.page));
 });
 
 // ── FIRESTORE HELPERS ─────────────────────────────────────────────────────
@@ -801,6 +948,11 @@ async function renderSidebar(){
   const tf=await getTotalFunds();
   document.getElementById('sf-total').textContent=`$${tf.toLocaleString()}`;
   document.getElementById('sf-goal').textContent=`$${(currentTripData.savingsGoal||0).toLocaleString()}`;
+  // Update mobile header
+  const mobName=document.getElementById('mob-trip-name');
+  const mobFunds=document.getElementById('mob-funds');
+  if(mobName)mobName.textContent=currentTripData.tripName||'Senior';
+  if(mobFunds)mobFunds.textContent=`$${tf.toLocaleString()}`;
   const anns=await getCol('announcements');
   const badge=document.getElementById('ann-badge');
   if(anns.length>0){badge.classList.remove('hidden');badge.textContent=anns.length;}else badge.classList.add('hidden');
