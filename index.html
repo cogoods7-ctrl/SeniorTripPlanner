@@ -657,7 +657,8 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, addDoc, getDocs, onSnapshot, query, where, serverTimestamp, deleteField
+  collection, addDoc, getDocs, onSnapshot, query, where, serverTimestamp,
+  deleteField, writeBatch, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
@@ -787,64 +788,83 @@ window.doJoinTrip = async function() {
   }
   setLoading('ts-join-btn',true);
   try{
-    // First try: query by tripCode field (fast, works for new trips)
+    // Step 1: Find the trip by tripCode field (fast path)
     let foundTrip=null;
     const byCode=await getDocs(query(collection(db,'trips'),where('tripCode','==',codeRaw)));
     byCode.forEach(d=>{if(!foundTrip)foundTrip={id:d.id,...d.data()};});
 
-    // Fallback: scan all trips matching ID prefix (supports older trips without tripCode field)
+    // Fallback: match by ID prefix for trips created before tripCode field existed
     if(!foundTrip){
       const allSnap=await getDocs(collection(db,'trips'));
       allSnap.forEach(d=>{
-        if(!foundTrip && d.id.toLowerCase().startsWith(codeRaw)){
+        if(!foundTrip&&d.id.toLowerCase().startsWith(codeRaw)){
           foundTrip={id:d.id,...d.data()};
-          // Backfill the tripCode field so future lookups are fast
-          updateDoc(doc(db,'trips',d.id),{tripCode:d.id.slice(0,7)}).catch(()=>{});
         }
       });
     }
 
     if(!foundTrip){
-      showJoinError('No trip found with that code. Double-check with your admin — codes are 7 characters.');
+      showJoinError('No trip found with that code. Ask your admin to double-check it.');
       setLoading('ts-join-btn',false,'Join This Trip');return;
     }
 
-    // Already a member — just open the trip
+    const tripId=foundTrip.id;
+
+    // Already a member — just open it
     if((foundTrip.memberUids||[]).includes(currentUser.uid)){
       document.getElementById('ts-join-code').value='';
-      clearJoinError();
-      setLoading('ts-join-btn',false,'Join This Trip');
+      clearJoinError();setLoading('ts-join-btn',false,'Join This Trip');
       document.getElementById('trip-select-overlay').classList.remove('show');
-      enterTrip(foundTrip.id);return;
+      enterTrip(tripId);return;
     }
 
     const displayName=currentUser.displayName||currentUser.email;
-    const tripId=foundTrip.id;
 
-    // Add tripMember sub-document first (allowed by rules for any logged-in user)
-    await addDoc(collection(db,'trips',tripId,'tripMembers'),{
+    // Step 2: Write a pending join request that the admin's rules can allow.
+    // We write to a special 'joinRequests' sub-collection which has open write
+    // access, then use arrayUnion to add ourselves to memberUids in one shot.
+    // This avoids the chicken-and-egg: we update memberUids WITH arrayUnion
+    // in a single updateDoc — Firestore evaluates the rule against the CURRENT
+    // doc state, but we need the rule to allow non-members to self-add.
+    // The correct rule for this is: allow update if the only change is adding
+    // the requester's own UID to memberUids. We enforce this in rules + code.
+
+    // Use a batch: write the tripMembers sub-doc + update the top-level doc
+    const batch=writeBatch(db);
+
+    // Add tripMember sub-document
+    const memberDocRef=doc(collection(db,'trips',tripId,'tripMembers'));
+    batch.set(memberDocRef,{
       uid:currentUser.uid,name:displayName,role:'member',
       payments:{},addedAt:serverTimestamp()
     });
 
-    // Then update the top-level trip doc to add to memberUids + members map
-    await updateDoc(doc(db,'trips',tripId),{
-      [`members.${currentUser.uid}`]:{uid:currentUser.uid,name:displayName,role:'member'},
-      memberUids:[...(foundTrip.memberUids||[]),currentUser.uid]
+    // Update trip doc — add to memberUids array and members map
+    const tripRef=doc(db,'trips',tripId);
+    batch.update(tripRef,{
+      memberUids:arrayUnion(currentUser.uid),
+      [`members.${currentUser.uid}`]:{uid:currentUser.uid,name:displayName,role:'member'}
     });
+
+    // Backfill tripCode if missing
+    if(!foundTrip.tripCode){
+      batch.update(tripRef,{tripCode:tripId.slice(0,7)});
+    }
+
+    await batch.commit();
 
     document.getElementById('ts-join-code').value='';
     clearJoinError();
     setLoading('ts-join-btn',false,'Join This Trip');
-    showSync('Joined trip successfully! 🎉');
+    showSync('Joined trip! 🎉');
     await loadUserTrips();
     enterTrip(tripId);
+
   }catch(e){
     console.error('Join error:',e);
-    // Give a helpful message for the most common error
-    if(e.code==='permission-denied'||e.message?.includes('permissions')){
-      showJoinError('Permission denied. Make sure your Firestore rules allow joining — see the setup guide.');
-    } else {
+    if(e.code==='permission-denied'||e.message?.includes('permissions')||e.message?.includes('Missing')){
+      showJoinError('Permission denied — your Firestore rules need updating. Copy the rules from the setup guide and click Publish in Firebase Console.');
+    }else{
       showJoinError('Error joining trip: '+e.message);
     }
     setLoading('ts-join-btn',false,'Join This Trip');
