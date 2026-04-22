@@ -294,7 +294,6 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
       <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
-      <button class="auth-tab" onclick="switchAuthTab('join')">Join Trip</button>
     </div>
     <div id="auth-error" class="auth-error"></div>
     <!-- LOGIN -->
@@ -330,23 +329,7 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
         </div>
       </div>
       <button class="btn btn-full" id="signup-btn" onclick="doSignup()">Create Account</button>
-    </div>
-    <!-- JOIN TRIP -->
-    <div id="auth-join" class="auth-step">
-      <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:12px;padding:14px;margin-bottom:18px;">
-        <div style="color:var(--teal);font-weight:600;font-size:13px;margin-bottom:4px;">🔑 How joining works</div>
-        <div style="color:var(--muted);font-size:12px;line-height:1.6;">Ask your trip's <strong style="color:var(--text);">admin</strong> for the Trip Code. Enter it below and you'll be added instantly.</div>
-      </div>
-      <div class="mb16">
-        <label class="field-label">Your Name</label>
-        <input class="inp" id="join-name" type="text" placeholder="Your name (as it'll appear in the trip)"/>
-      </div>
-      <div class="mb20">
-        <label class="field-label">Trip Code</label>
-        <input class="inp" id="join-code" type="text" placeholder="e.g. abc1234" style="text-transform:lowercase;letter-spacing:0.06em;font-size:16px;font-weight:600;"/>
-      </div>
-      <button class="btn btn-full" id="join-btn" onclick="doJoinTrip()">Join Trip</button>
-      <div style="color:var(--dim);font-size:11px;margin-top:12px;text-align:center;">Already have an account? <button onclick="switchAuthTab('login')" style="background:none;border:none;color:var(--coral);cursor:pointer;font-size:11px;font-family:inherit;text-decoration:underline;">Sign in instead</button></div>
+      <p style="color:var(--dim);font-size:12px;margin-top:12px;text-align:center;">Have a trip invite link? Sign up first, then use the link.</p>
     </div>
   </div>
 </div>
@@ -354,37 +337,66 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
 <!-- ── TRIP SELECT OVERLAY ── -->
 <div id="trip-select-overlay">
   <div class="trip-select-card">
-    <div class="auth-logo" style="margin-bottom:6px;"><span>Your</span> Trips</div>
-    <div class="auth-subtitle" id="trip-select-sub">Select a trip or create a new one.</div>
-    <div id="trip-list-wrap" style="margin-bottom:20px;"></div>
-    <div style="border-top:1px solid var(--border);padding-top:20px;">
-      <div style="color:var(--text);font-weight:600;font-size:14px;margin-bottom:14px;">➕ Create New Trip</div>
-      <div class="mb16">
-        <label class="field-label">Trip Name</label>
-        <input class="inp" id="new-trip-name" placeholder="e.g. Cabo Senior Trip '29"/>
-      </div>
-      <div class="g2 mb16">
-        <div>
-          <label class="field-label">Trip Date</label>
-          <input class="inp" id="new-trip-date" type="date"/>
-        </div>
-        <div>
-          <label class="field-label">Trip Type</label>
-          <select class="inp" id="new-trip-type" onchange="updateNewTripSuggestion()">
-            <option value="budget">Budget</option>
-            <option value="standard" selected>Standard</option>
-            <option value="luxury">Luxury</option>
-          </select>
-        </div>
-      </div>
-      <div class="suggestion-box mb16" id="new-trip-suggestion">
-        <div class="suggestion-title">💡 Budget Suggestion</div>
-        <div class="suggestion-text" id="new-trip-suggestion-text">We suggest a goal of <strong>$600</strong> for a standard trip.</div>
-      </div>
-      <button class="btn btn-full" id="create-trip-btn" onclick="createTrip()">Create Trip & Start Planning</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+      <div class="auth-logo"><span>Your</span> Trips</div>
+      <button class="btn btn-ghost btn-sm" onclick="doSignOut()" style="margin-top:4px;">Sign Out</button>
     </div>
-    <div style="text-align:right;margin-top:16px;">
-      <button class="btn btn-ghost btn-sm" onclick="doSignOut()">Sign Out</button>
+    <div class="auth-subtitle" id="trip-select-sub">Select a trip, or create / join one.</div>
+
+    <!-- Existing trips -->
+    <div id="trip-list-wrap" style="margin-bottom:4px;"></div>
+
+    <!-- Tab switcher for create vs join -->
+    <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:8px;">
+      <div style="display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <button id="ts-tab-create" class="auth-tab active" onclick="switchTripTab('create')" style="font-size:13px;">➕ Create Trip</button>
+        <button id="ts-tab-join" class="auth-tab" onclick="switchTripTab('join')" style="font-size:13px;">🔑 Join Trip</button>
+      </div>
+
+      <!-- CREATE PANEL -->
+      <div id="ts-create-panel">
+        <div class="mb16">
+          <label class="field-label">Trip Name</label>
+          <input class="inp" id="new-trip-name" placeholder="e.g. Cabo Senior Trip '29"/>
+        </div>
+        <div class="g2 mb16">
+          <div>
+            <label class="field-label">Trip Date</label>
+            <input class="inp" id="new-trip-date" type="date"/>
+          </div>
+          <div>
+            <label class="field-label">Trip Type</label>
+            <select class="inp" id="new-trip-type" onchange="updateNewTripSuggestion()">
+              <option value="budget">Budget</option>
+              <option value="standard" selected>Standard</option>
+              <option value="luxury">Luxury</option>
+            </select>
+          </div>
+        </div>
+        <div class="suggestion-box mb16">
+          <div class="suggestion-title">💡 Budget Suggestion</div>
+          <div class="suggestion-text" id="new-trip-suggestion-text">We suggest a goal of <strong>$600</strong> for a standard trip.</div>
+        </div>
+        <button class="btn btn-full" id="create-trip-btn" onclick="createTrip()">Create Trip & Start Planning</button>
+      </div>
+
+      <!-- JOIN PANEL -->
+      <div id="ts-join-panel" class="hidden">
+        <div id="ts-join-autofill-notice" class="hidden" style="background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--teal);">
+          ✅ Trip code detected from your invite link!
+        </div>
+        <div style="background:rgba(0,212,170,0.05);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+          <div style="color:var(--teal);font-weight:600;font-size:13px;margin-bottom:3px;">How to join</div>
+          <div style="color:var(--muted);font-size:12px;line-height:1.6;">Enter the 7-character trip code your admin shared. Your name will be taken from your account.</div>
+        </div>
+        <div id="ts-join-error" style="background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none;"></div>
+        <div class="mb16">
+          <label class="field-label">Trip Code</label>
+          <input class="inp" id="ts-join-code" type="text" placeholder="e.g. abc1234" autocomplete="off"
+            style="text-transform:lowercase;letter-spacing:0.08em;font-size:18px;font-weight:700;text-align:center;"/>
+        </div>
+        <button class="btn btn-full btn-teal" id="ts-join-btn" onclick="doJoinTrip()">Join This Trip</button>
+      </div>
     </div>
   </div>
 </div>
@@ -587,15 +599,22 @@ label.field-label{display:block;color:var(--muted);font-size:12px;font-weight:60
   <div id="admin-only-banner" class="admin-banner hidden">👑 You are the Admin — you can edit trip details and manage members.</div>
   <!-- TRIP CODE (always visible) -->
   <div class="card mb16">
-    <div class="card-title">🔑 Trip Invite Code</div>
-    <div class="trip-code-box">
+    <div class="card-title">🔑 Trip Invite</div>
+    <div class="trip-code-box" style="margin-bottom:12px;">
       <div>
-        <div class="trip-code-label">Share this code with friends to join</div>
+        <div class="trip-code-label">Share code</div>
         <div class="trip-code-value" id="settings-trip-code">——</div>
       </div>
       <button class="trip-code-copy" onclick="copyTripCode()">📋 Copy Code</button>
     </div>
-    <div style="color:var(--dim);font-size:12px;margin-top:10px;">Friends go to the <strong style="color:var(--text);">Join Trip</strong> tab on the login screen and enter this code.</div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
+        <div style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Invite Link</div>
+        <div id="settings-invite-link" style="color:var(--teal);font-size:12px;word-break:break-all;line-height:1.5;">—</div>
+      </div>
+      <button class="trip-code-copy" onclick="copyInviteLink()" style="flex-shrink:0;">🔗 Copy Link</button>
+    </div>
+    <div style="color:var(--dim);font-size:12px;margin-top:10px;line-height:1.5;">Friends click the invite link or go to <strong style="color:var(--text);">Your Trips → Join Trip</strong> and enter the code after signing in.</div>
   </div>
   <div class="g2">
     <div class="col">
@@ -674,13 +693,23 @@ function setLoading(btnId,loading,label=''){const b=document.getElementById(btnI
 
 // ── AUTH UI ───────────────────────────────────────────────────────────────
 window.switchAuthTab = function(tab) {
-  const tabs=['login','signup','join'];
+  const tabs=['login','signup'];
   document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
   tabs.forEach(t=>{
     const el=document.getElementById('auth-'+t);
     if(el)el.classList.toggle('active',t===tab);
   });
   document.getElementById('auth-error').classList.remove('show');
+};
+
+window.switchTripTab = function(tab){
+  document.getElementById('ts-tab-create').classList.toggle('active',tab==='create');
+  document.getElementById('ts-tab-join').classList.toggle('active',tab==='join');
+  document.getElementById('ts-create-panel').classList.toggle('hidden',tab!=='create');
+  document.getElementById('ts-join-panel').classList.toggle('hidden',tab!=='join');
+  // Clear join error when switching
+  const err=document.getElementById('ts-join-error');
+  if(err){err.style.display='none';err.textContent='';}
 };
 
 window.togglePw = function(inputId, btn) {
@@ -739,49 +768,62 @@ window.doSignOut = async function() {
   document.getElementById('auth-overlay').classList.remove('hidden');
 };
 
-// Join a trip using its short code (first 7 chars of trip doc ID)
+// ── JOIN TRIP (runs after user is signed in, from Trip Select screen) ─────
+function showJoinError(msg){
+  const el=document.getElementById('ts-join-error');
+  if(el){el.textContent=msg;el.style.display='block';}
+}
+function clearJoinError(){
+  const el=document.getElementById('ts-join-error');
+  if(el){el.style.display='none';el.textContent='';}
+}
+
 window.doJoinTrip = async function() {
-  const name=document.getElementById('join-name').value.trim();
-  const code=document.getElementById('join-code').value.trim().toLowerCase();
-  if(!name)return showAuthError('Please enter your name.');
-  if(!code||code.length<4)return showAuthError('Please enter a valid trip code.');
-  setLoading('join-btn',true);
+  clearJoinError();
+  if(!currentUser){showJoinError('You must be signed in to join a trip.');return;}
+  const codeRaw=document.getElementById('ts-join-code')?.value?.trim().toLowerCase()||'';
+  if(!codeRaw||codeRaw.length<4){showJoinError('Please enter a valid trip code (at least 4 characters).');return;}
+  setLoading('ts-join-btn',true);
   try{
-    // Trip codes are the first 7 chars of the Firestore doc ID
-    // We query all trips and find the one whose ID starts with the code
+    // Scan all trips for one whose ID starts with the entered code
     const snap=await getDocs(collection(db,'trips'));
     let foundTrip=null;
-    snap.forEach(d=>{if(d.id.startsWith(code))foundTrip={id:d.id,...d.data()};});
+    snap.forEach(d=>{
+      if(d.id.toLowerCase().startsWith(codeRaw)) foundTrip={id:d.id,...d.data()};
+    });
     if(!foundTrip){
-      showAuthError('No trip found with that code. Double-check with your admin.');
-      setLoading('join-btn',false,'Join Trip');return;
+      showJoinError('No trip found with that code. Double-check with your admin — codes are case-insensitive.');
+      setLoading('ts-join-btn',false,'Join This Trip');return;
     }
-    const tripId=foundTrip.id;
-    // Check not already a member
+    // Already a member? Just open it
     if((foundTrip.memberUids||[]).includes(currentUser.uid)){
-      setLoading('join-btn',false,'Join Trip');
-      document.getElementById('auth-overlay').classList.add('hidden');
-      await loadUserTrips();return;
+      setLoading('ts-join-btn',false,'Join This Trip');
+      document.getElementById('ts-join-code').value='';
+      document.getElementById('trip-select-overlay').classList.remove('show');
+      enterTrip(foundTrip.id);return;
     }
-    const displayName=name||currentUser.displayName||currentUser.email;
-    // Add as tripMember sub-doc
+    const displayName=currentUser.displayName||currentUser.email;
+    const tripId=foundTrip.id;
+    // Add tripMember sub-document
     await addDoc(collection(db,'trips',tripId,'tripMembers'),{
-      uid:currentUser.uid,name:displayName,role:'member',payments:{},addedAt:serverTimestamp()
+      uid:currentUser.uid,name:displayName,role:'member',
+      payments:{},addedAt:serverTimestamp()
     });
     // Update top-level trip doc
     await updateDoc(doc(db,'trips',tripId),{
       [`members.${currentUser.uid}`]:{uid:currentUser.uid,name:displayName,role:'member'},
       memberUids:[...(foundTrip.memberUids||[]),currentUser.uid]
     });
-    setLoading('join-btn',false,'Join Trip');
-    document.getElementById('join-code').value='';
-    document.getElementById('join-name').value='';
-    document.getElementById('auth-overlay').classList.add('hidden');
+    setLoading('ts-join-btn',false,'Join This Trip');
+    document.getElementById('ts-join-code').value='';
+    clearJoinError();
+    // Refresh trip list and enter the trip
     await loadUserTrips();
+    enterTrip(tripId);
   }catch(e){
-    console.error(e);
-    showAuthError('Error joining trip: '+e.message);
-    setLoading('join-btn',false,'Join Trip');
+    console.error('Join error:',e);
+    showJoinError('Error joining trip: '+e.message);
+    setLoading('ts-join-btn',false,'Join This Trip');
   }
 };
 
@@ -825,13 +867,14 @@ async function loadUserTrips(){
     const snap=await getDocs(query(collection(db,'trips'),where('memberUids','array-contains',currentUser.uid)));
     snap.forEach(d=>trips.push({id:d.id,...d.data()}));
   }catch(e){console.error('Trip load error:',e);}
+
   const wrap=document.getElementById('trip-list-wrap');
   const sub=document.getElementById('trip-select-sub');
   if(trips.length===0){
-    wrap.innerHTML='<div class="empty" style="padding:20px 0;">No trips yet. Create one below or use a Trip Code to join!</div>';
-    sub.textContent='Create a trip or join one with a code.';
+    wrap.innerHTML='<div class="empty" style="padding:16px 0 8px;font-size:13px;">No trips yet — create one or join with a code!</div>';
+    sub.textContent='You\'re signed in as '+(currentUser.displayName||currentUser.email)+'.';
   } else {
-    sub.textContent='Select a trip, or create / join another.';
+    sub.textContent='Signed in as '+(currentUser.displayName||currentUser.email)+'.';
     wrap.innerHTML=trips.map(t=>{
       const role=t.members?.[currentUser.uid]?.role||'member';
       const code=t.id.slice(0,7);
@@ -840,12 +883,26 @@ async function loadUserTrips(){
         <div class="trip-info">
           <div class="trip-name">${esc(t.tripName||'Untitled Trip')}</div>
           <div class="trip-meta">${(t.memberUids||[]).length} members · Goal: $${(t.savingsGoal||0).toLocaleString()}</div>
-          ${role==='admin'?`<div style="color:var(--dim);font-size:11px;margin-top:2px;">Share code: <strong style="color:var(--teal);letter-spacing:0.05em;">${code}</strong></div>`:''}
+          ${role==='admin'?`<div style="color:var(--dim);font-size:11px;margin-top:2px;">Code: <strong style="color:var(--teal);letter-spacing:0.05em;">${code}</strong></div>`:''}
         </div>
         <span class="trip-role ${role==='admin'?'role-admin':'role-member'}">${role}</span>
       </div>`;
     }).join('');
   }
+
+  // Check for ?join=CODE in the URL — auto-fill and switch to join tab
+  const params=new URLSearchParams(window.location.search);
+  const joinCode=params.get('join');
+  if(joinCode){
+    const codeInput=document.getElementById('ts-join-code');
+    if(codeInput)codeInput.value=joinCode.toLowerCase();
+    const notice=document.getElementById('ts-join-autofill-notice');
+    if(notice)notice.classList.remove('hidden');
+    switchTripTab('join');
+    // Clean the URL so it doesn't re-trigger on refresh
+    window.history.replaceState({},'',window.location.pathname);
+  }
+
   document.getElementById('trip-select-overlay').classList.add('show');
 }
 
@@ -1286,10 +1343,15 @@ async function renderSettings(){
   const D=currentTripData;
   const isAdmin=userRole==='admin';
   document.getElementById('admin-only-banner').classList.toggle('hidden',!isAdmin);
-  // Trip code — always show
+  // Trip code + invite link — always show
   const code=currentTripId?currentTripId.slice(0,7):'——';
   const codeEl=document.getElementById('settings-trip-code');
   if(codeEl)codeEl.textContent=code;
+  const linkEl=document.getElementById('settings-invite-link');
+  if(linkEl&&currentTripId){
+    const link=`${window.location.origin}${window.location.pathname}?join=${code}`;
+    linkEl.textContent=link;
+  }
   const fields=['set-trip-name','trip-date-inp','goal-inp','set-monthly','set-trip-type','save-settings-btn'];
   fields.forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!isAdmin;});
   document.getElementById('set-trip-name').value=D.tripName||'';
@@ -1318,16 +1380,19 @@ async function renderSettings(){
 window.copyTripCode = function(){
   const code=currentTripId?currentTripId.slice(0,7):'';
   if(!code)return;
-  navigator.clipboard.writeText(code).then(()=>{
-    showSync('Code copied to clipboard! ✓');
-  }).catch(()=>{
-    // Fallback for browsers that block clipboard
+  navigator.clipboard.writeText(code).then(()=>showSync('Code copied! ✓')).catch(()=>{
     const el=document.getElementById('settings-trip-code');
-    const range=document.createRange();
-    range.selectNode(el);
-    window.getSelection().removeAllRanges();
-    window.getSelection().addRange(range);
-    showSync('Code selected — copy it manually');
+    if(el){const r=document.createRange();r.selectNode(el);window.getSelection().removeAllRanges();window.getSelection().addRange(r);}
+    showSync('Select and copy the code manually');
+  });
+};
+
+window.copyInviteLink = function(){
+  const code=currentTripId?currentTripId.slice(0,7):'';
+  if(!code)return;
+  const link=`${window.location.origin}${window.location.pathname}?join=${code}`;
+  navigator.clipboard.writeText(link).then(()=>showSync('Invite link copied! 🔗')).catch(()=>{
+    showSync('Could not copy — try manually');
   });
 };
 
@@ -1397,6 +1462,15 @@ window.exportData = async function(){
 function populateSelect(sel,members){
   const cur=sel.value;
   sel.innerHTML='<option value="">-- Select your name --</option>'+members.map(m=>`<option value="${m.id}"${m.id===cur?' selected':''}>${esc(m.name)}</option>`).join('');
+}
+
+// If page loaded with ?join=CODE, store it so we can use it after login
+const _pendingJoinCode=(new URLSearchParams(window.location.search)).get('join')||'';
+if(_pendingJoinCode){
+  // Don't clean the URL yet — loadUserTrips will handle it after login
+  // Show a note on the login screen
+  const sub=document.querySelector('.auth-subtitle');
+  if(sub)sub.innerHTML='You have a trip invite! <strong style="color:var(--teal);">Sign in or create an account</strong> to join.';
 }
 
 // init budget suggestion on page load
