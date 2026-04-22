@@ -768,7 +768,7 @@ window.doSignOut = async function() {
   document.getElementById('auth-overlay').classList.remove('hidden');
 };
 
-// ── JOIN TRIP (runs after user is signed in, from Trip Select screen) ─────
+// ── JOIN TRIP ──────────────────────────────────────────────────────────────
 function showJoinError(msg){
   const el=document.getElementById('ts-join-error');
   if(el){el.textContent=msg;el.style.display='block';}
@@ -781,48 +781,72 @@ function clearJoinError(){
 window.doJoinTrip = async function() {
   clearJoinError();
   if(!currentUser){showJoinError('You must be signed in to join a trip.');return;}
-  const codeRaw=document.getElementById('ts-join-code')?.value?.trim().toLowerCase()||'';
-  if(!codeRaw||codeRaw.length<4){showJoinError('Please enter a valid trip code (at least 4 characters).');return;}
+  const codeRaw=(document.getElementById('ts-join-code')?.value||'').trim().toLowerCase();
+  if(!codeRaw||codeRaw.length<4){
+    showJoinError('Please enter a valid trip code (at least 4 characters).');return;
+  }
   setLoading('ts-join-btn',true);
   try{
-    // Scan all trips for one whose ID starts with the entered code
-    const snap=await getDocs(collection(db,'trips'));
+    // First try: query by tripCode field (fast, works for new trips)
     let foundTrip=null;
-    snap.forEach(d=>{
-      if(d.id.toLowerCase().startsWith(codeRaw)) foundTrip={id:d.id,...d.data()};
-    });
+    const byCode=await getDocs(query(collection(db,'trips'),where('tripCode','==',codeRaw)));
+    byCode.forEach(d=>{if(!foundTrip)foundTrip={id:d.id,...d.data()};});
+
+    // Fallback: scan all trips matching ID prefix (supports older trips without tripCode field)
     if(!foundTrip){
-      showJoinError('No trip found with that code. Double-check with your admin — codes are case-insensitive.');
+      const allSnap=await getDocs(collection(db,'trips'));
+      allSnap.forEach(d=>{
+        if(!foundTrip && d.id.toLowerCase().startsWith(codeRaw)){
+          foundTrip={id:d.id,...d.data()};
+          // Backfill the tripCode field so future lookups are fast
+          updateDoc(doc(db,'trips',d.id),{tripCode:d.id.slice(0,7)}).catch(()=>{});
+        }
+      });
+    }
+
+    if(!foundTrip){
+      showJoinError('No trip found with that code. Double-check with your admin — codes are 7 characters.');
       setLoading('ts-join-btn',false,'Join This Trip');return;
     }
-    // Already a member? Just open it
+
+    // Already a member — just open the trip
     if((foundTrip.memberUids||[]).includes(currentUser.uid)){
-      setLoading('ts-join-btn',false,'Join This Trip');
       document.getElementById('ts-join-code').value='';
+      clearJoinError();
+      setLoading('ts-join-btn',false,'Join This Trip');
       document.getElementById('trip-select-overlay').classList.remove('show');
       enterTrip(foundTrip.id);return;
     }
+
     const displayName=currentUser.displayName||currentUser.email;
     const tripId=foundTrip.id;
-    // Add tripMember sub-document
+
+    // Add tripMember sub-document first (allowed by rules for any logged-in user)
     await addDoc(collection(db,'trips',tripId,'tripMembers'),{
       uid:currentUser.uid,name:displayName,role:'member',
       payments:{},addedAt:serverTimestamp()
     });
-    // Update top-level trip doc
+
+    // Then update the top-level trip doc to add to memberUids + members map
     await updateDoc(doc(db,'trips',tripId),{
       [`members.${currentUser.uid}`]:{uid:currentUser.uid,name:displayName,role:'member'},
       memberUids:[...(foundTrip.memberUids||[]),currentUser.uid]
     });
-    setLoading('ts-join-btn',false,'Join This Trip');
+
     document.getElementById('ts-join-code').value='';
     clearJoinError();
-    // Refresh trip list and enter the trip
+    setLoading('ts-join-btn',false,'Join This Trip');
+    showSync('Joined trip successfully! 🎉');
     await loadUserTrips();
     enterTrip(tripId);
   }catch(e){
     console.error('Join error:',e);
-    showJoinError('Error joining trip: '+e.message);
+    // Give a helpful message for the most common error
+    if(e.code==='permission-denied'||e.message?.includes('permissions')){
+      showJoinError('Permission denied. Make sure your Firestore rules allow joining — see the setup guide.');
+    } else {
+      showJoinError('Error joining trip: '+e.message);
+    }
     setLoading('ts-join-btn',false,'Join This Trip');
   }
 };
@@ -924,10 +948,12 @@ window.createTrip = async function(){
     const tripRef=await addDoc(collection(db,'trips'),{
       tripName:name,tripDate:date,tripType:type,savingsGoal:suggestion,
       monthlyRate:5,createdBy:currentUser.uid,createdAt:serverTimestamp(),
-      // memberUids array for simple array-contains queries
       memberUids:[currentUser.uid],
       members:{[currentUser.uid]:{uid:currentUser.uid,name:displayName,role:'admin'}}
     });
+    // Store the 7-char code as a queryable field on the doc itself
+    const tripCode=tripRef.id.slice(0,7);
+    await updateDoc(tripRef,{tripCode});
     await addDoc(collection(db,'trips',tripRef.id,'tripMembers'),{
       uid:currentUser.uid,name:displayName,
       role:'admin',payments:{},addedAt:serverTimestamp()
