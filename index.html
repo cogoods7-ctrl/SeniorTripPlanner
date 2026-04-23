@@ -658,7 +658,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, addDoc, getDocs, onSnapshot, query, where, serverTimestamp,
-  deleteField, writeBatch, arrayUnion
+  deleteField, writeBatch, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
@@ -1009,9 +1009,22 @@ window.leaveTrip = async function(){
 // ── REAL-TIME LISTENER ────────────────────────────────────────────────────
 function subscribeTrip(){
   const tripRef=doc(db,'trips',currentTripId);
-  const unsub=onSnapshot(tripRef,snap=>{
-    if(!snap.exists())return;
-    currentTripData={id:snap.id,...snap.data()};
+
+  const unsub=onSnapshot(tripRef, snap=>{
+    if(!snap.exists()){
+      // Trip was deleted — kick everyone out
+      handleKickedFromTrip('This trip no longer exists.');
+      return;
+    }
+    const data={id:snap.id,...snap.data()};
+
+    // Check if current user has been removed from memberUids
+    if(currentUser && !(data.memberUids||[]).includes(currentUser.uid)){
+      handleKickedFromTrip('You have been removed from this trip by the admin.');
+      return;
+    }
+
+    currentTripData=data;
     userRole=currentTripData.members?.[currentUser.uid]?.role||'member';
     document.getElementById('sidebar-trip-name').textContent=currentTripData.tripName||'Senior';
     const mobName=document.getElementById('mob-trip-name');
@@ -1019,16 +1032,41 @@ function subscribeTrip(){
     document.getElementById('sf-goal').textContent=`$${(currentTripData.savingsGoal||0).toLocaleString()}`;
     renderSidebar();
     render(currentPage);
+  }, err=>{
+    // Firestore rules denied access — user was removed and rules now block them
+    console.warn('Trip listener error:',err.code);
+    if(err.code==='permission-denied'){
+      handleKickedFromTrip('You have been removed from this trip.');
+    }
   });
+
   unsubListeners.push(unsub);
 
-  // Listen to sub-collections
+  // Sub-collection listeners — also handle permission errors gracefully
   const cols=['tripMembers','announcements','locations','bucketList','polls','expenses'];
   cols.forEach(col=>{
-    const u=onSnapshot(collection(db,'trips',currentTripId,col),()=>render(currentPage));
+    const u=onSnapshot(
+      collection(db,'trips',currentTripId,col),
+      ()=>render(currentPage),
+      err=>{ if(err.code==='permission-denied') handleKickedFromTrip('You have been removed from this trip.'); }
+    );
     unsubListeners.push(u);
   });
 }
+
+// Called whenever a user loses access to the current trip
+function handleKickedFromTrip(message){
+  unsubAll();
+  currentTripId=null;
+  currentTripData=null;
+  userRole='member';
+  // Show a clear message then redirect to trip selector
+  showSync(message, true);
+  setTimeout(async()=>{
+    await loadUserTrips();
+  }, 1800);
+}
+
 function unsubAll(){unsubListeners.forEach(u=>u());unsubListeners=[];}
 
 // ── CURRENT PAGE ──────────────────────────────────────────────────────────
@@ -1459,23 +1497,30 @@ window.addMember = async function(){
 
 window.removeMember = async function(docId,membUid){
   if(userRole!=='admin')return;
-  if(!confirm('Remove this member?'))return;
-  await deleteDoc(tripDoc('tripMembers',docId));
-  const updatedUids=(currentTripData.memberUids||[]).filter(id=>id!==membUid);
-  await updateDoc(doc(db,'trips',currentTripId),{
-    [`members.${membUid}`]:deleteField(),
-    memberUids:updatedUids
-  });
-  showSync('Member removed ✓');
+  if(!confirm('Remove this member? They will immediately lose access to the trip.'))return;
+  try{
+    const batch=writeBatch(db);
+    // Remove the tripMember sub-document
+    batch.delete(tripDoc('tripMembers',docId));
+    // Atomically remove from memberUids array and delete from members map
+    batch.update(doc(db,'trips',currentTripId),{
+      memberUids:arrayRemove(membUid),
+      [`members.${membUid}`]:deleteField()
+    });
+    await batch.commit();
+    showSync('Member removed ✓');
+  }catch(e){
+    console.error('Remove member error:',e);
+    showSync('Error removing member: '+e.message,true);
+  }
 };
 
 window.leaveTrip = async function(){
   if(!confirm('Leave this trip? You will need an admin to re-add you.'))return;
   try{
-    const updatedUids=(currentTripData.memberUids||[]).filter(id=>id!==currentUser.uid);
     await updateDoc(doc(db,'trips',currentTripId),{
       [`members.${currentUser.uid}`]:deleteField(),
-      memberUids:updatedUids
+      memberUids:arrayRemove(currentUser.uid)
     });
     currentTripId=null;currentTripData=null;
     unsubAll();
