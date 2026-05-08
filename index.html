@@ -605,7 +605,7 @@ body.is-desktop #mobile-nav{display:none!important;}
     <div class="card-title">💳 My Contribution</div>
     <div style="color:var(--muted);font-size:13px;margin-bottom:14px;" id="my-contrib-name">Loading…</div>
     <div id="my-month-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
-    <div style="color:var(--dim);font-size:11px;">Tap a month to mark it paid or unpaid. Past months only.</div>
+    <div style="color:var(--dim);font-size:11px;">Tap any month to mark it paid or unpaid — including future months to pay in advance.</div>
   </div>
 
   <div class="g3 mb20">
@@ -1358,8 +1358,8 @@ async function renderFunds(){
   const months=genMonths(36);
   const ck=gk(new Date());
   const nowIdx=months.indexOf(ck);
-  // Show past 6 months + current in My Contribution card
-  const myMonths=months.slice(Math.max(0,nowIdx-5),nowIdx+1);
+  // Show past 3 months + current + next 6 months for advance payment
+  const myMonths=months.slice(Math.max(0,nowIdx-3),nowIdx+7);
   // Find the current user's tripMember doc
   const myMemberDoc=members.find(m=>m.uid===currentUser.uid);
   const myCard=document.getElementById('my-contribution-card');
@@ -1373,15 +1373,16 @@ async function renderFunds(){
     grid.innerHTML=myMonths.map(mk=>{
       const paid=myMemberDoc.payments?.[mk];
       const isCurrent=mk===ck;
+      const isFuture=mk>ck;
       return`<button onclick="selfTogglePayment('${myMemberDoc.id}','${mk}')" style="
         display:flex;flex-direction:column;align-items:center;gap:4px;
-        padding:10px 14px;border-radius:10px;border:1px solid ${paid?'var(--teal)':isCurrent?'var(--coral)':'var(--border)'};
-        background:${paid?'rgba(0,212,170,0.12)':isCurrent?'rgba(255,107,74,0.08)':'rgba(255,255,255,0.03)'};
+        padding:10px 14px;border-radius:10px;border:1px solid ${paid?'var(--teal)':isCurrent?'var(--coral)':isFuture?'rgba(245,200,66,0.3)':'var(--border)'};
+        background:${paid?'rgba(0,212,170,0.12)':isCurrent?'rgba(255,107,74,0.08)':isFuture?'rgba(245,200,66,0.05)':'rgba(255,255,255,0.03)'};
         cursor:pointer;transition:all 0.18s;min-width:64px;
       ">
-        <span style="font-size:18px;">${paid?'✅':'💸'}</span>
-        <span style="font-size:11px;font-weight:700;color:${paid?'var(--teal)':isCurrent?'var(--coral)':'var(--muted)'};">${ml(mk)}</span>
-        <span style="font-size:10px;color:${paid?'var(--teal)':'var(--dim)'};">${paid?'Paid':'Unpaid'}</span>
+        <span style="font-size:18px;">${paid?'✅':isFuture?'⏳':'💸'}</span>
+        <span style="font-size:11px;font-weight:700;color:${paid?'var(--teal)':isCurrent?'var(--coral)':isFuture?'var(--gold)':'var(--muted)'};">${ml(mk)}</span>
+        <span style="font-size:10px;color:${paid?'var(--teal)':isFuture?'var(--gold)':'var(--dim)'};">${paid?'Paid':isFuture?'Advance':'Unpaid'}</span>
       </button>`;
     }).join('');
   } else {
@@ -1409,8 +1410,8 @@ async function renderFunds(){
         const paid=m.payments?.[mk];const past=mk<=ck;
         const cls=paid?'paid':past?'missed':'upcoming';
         const sym=paid?'✓':past?'✗':'·';
-        // Admin can toggle all; members can only toggle their own past/current months
-        const canToggle=isAdmin||(isMe&&past);
+        // Admin can toggle all; members can toggle their own months (past + future)
+        const canToggle=isAdmin||isMe;
         const handler=isAdmin?`togglePayment('${m.id}','${mk}')`:canToggle?`selfTogglePayment('${m.id}','${mk}')`:null;
         return`<td><button class="pay-cell ${cls}" ${handler?`onclick="${handler}"`:'disabled'}
           title="${canToggle?(paid?'Mark unpaid':'Mark paid'):'View only'}">${sym}</button></td>`;
